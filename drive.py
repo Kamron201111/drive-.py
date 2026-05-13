@@ -5,6 +5,7 @@ import re
 import time
 import json
 import os
+import base64
 from datetime import date
 
 # =========================
@@ -17,6 +18,13 @@ ADMIN_ID = int(os.environ.get("ADMIN_ID", "8145417631"))
 BOT        = "@IPremium8_Renewbot"
 STATS_FILE = "stats.json"
 TIMEOUT    = 35 * 60  # 35 daqiqa
+
+# Session: environment variable dan oladi (Koyeb), yo'q bo'lsa lokal fayl
+_session_b64 = os.environ.get("SESSION_STRING", "")
+if _session_b64:
+    _session_bytes = base64.b64decode(_session_b64)
+    with open("session.session", "wb") as _f:
+        _f.write(_session_bytes)
 
 client = TelegramClient("session", API_ID, API_HASH)
 
