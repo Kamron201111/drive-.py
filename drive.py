@@ -953,27 +953,15 @@ async def all_stats_cmd(event):
 async def broadcast_cmd(event):
     if not is_admin(event.sender_id):
         return
-    all_users = stats.get("all_users", {})
-    if not all_users:
-        await safe_reply(event, "❌ Foydalanuvchilar yo'q")
-        return
-    lines = [
-        "👥 Kimga yuborish?\n",
-        "/broadcast_all — hammaga",
-        "Yoki: /broadcast_select 1,3\n",
-        "Ro'yxat:"
-    ]
-    for i, (fuid, fdata) in enumerate(all_users.items(), 1):
-        uname = f"@{fdata['username']}" if fdata.get("username") else ""
-        lines.append(f"{i}. {fdata['name']} {uname}")
-    await safe_reply(event, "\n".join(lines))
+    broadcast_mode[event.sender_id] = "dialogs"
+    await safe_reply(event, "📢 Barcha shaxsiy chatlarga yuborish.\nEndi xabar/rasm/video yuboring:")
 
 @client.on(events.NewMessage(pattern=r"^/broadcast_all$"))
 async def broadcast_all(event):
     if not is_admin(event.sender_id):
         return
-    broadcast_mode[event.sender_id] = "all"
-    await safe_reply(event, "📢 Hammaga yuborish. Endi xabar/rasm/video yuboring:")
+    broadcast_mode[event.sender_id] = "dialogs"
+    await safe_reply(event, "📢 Barcha shaxsiy chatlarga yuborish. Endi xabar/rasm/video yuboring:")
 
 @client.on(events.NewMessage(pattern=r"^/broadcast_select (.+)$"))
 async def broadcast_select(event):
@@ -1024,13 +1012,22 @@ async def handle_broadcast(event):
         return
 
     mode    = broadcast_mode.pop(uid)
-    all_u   = stats.get("all_users", {})
     blocked = [str(b) for b in stats.get("blocked", [])]
 
-    if mode == "all":
+    if mode == "dialogs":
+        targets = []
+        async for dialog in client.iter_dialogs():
+            if dialog.is_user and not dialog.entity.bot:
+                tid = dialog.entity.id
+                if str(tid) not in blocked and tid != uid:
+                    targets.append(tid)
+    elif mode == "all":
+        all_u   = stats.get("all_users", {})
         targets = [int(x) for x in all_u.keys() if x not in blocked]
     else:
         targets = [t for t in broadcast_targets.pop(uid, []) if str(t) not in blocked]
+
+    await safe_send(uid, f"⏳ {len(targets)} ta kishiga yuborilmoqda...")
 
     sent = failed = 0
     for tid in targets:
@@ -1040,7 +1037,7 @@ async def handle_broadcast(event):
             try:
                 await client.forward_messages(tid, event.message)
                 sent += 1
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.5)
                 break
             except FloodWaitError as e:
                 print(f"⏳ Broadcast FloodWait: {e.seconds}s")
@@ -1050,7 +1047,7 @@ async def handle_broadcast(event):
                 failed += 1
                 break
 
-    await safe_reply(event, f"📤 Yuborildi: {sent}\n❌ Xato: {failed}")
+    await safe_send(uid, f"📤 Yuborildi: {sent}\n❌ Xato: {failed}")
 
 # =========================
 # HELP
